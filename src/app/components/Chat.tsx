@@ -6,6 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { X } from 'lucide-react'
+import axios from 'axios'
 
 interface Message {
   role: 'user' | 'bot'
@@ -18,15 +19,39 @@ export default function Chat({ onClose }: { onClose: () => void }) {
   ])
   const [input, setInput] = useState('')
 
-  const handleSend = () => {
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleSend = async () => {
     if (input.trim()) {
-      setMessages([...messages, { role: 'user', content: input }])
-      // Here you would typically send the message to your AI backend and get a response
-      // For this example, we'll just echo the user's message
-      setTimeout(() => {
-        setMessages(prev => [...prev, { role: 'bot', content: `You said: ${input}. That's an interesting topic! I recommend checking out our courses on that subject.` }])
-      }, 1000)
-      setInput('')
+      // Add user message to the chat
+      setMessages(prev => [...prev, { role: 'user', content: input }])
+      setIsLoading(true)
+      
+      try {
+        // Send the message to the backend
+        const response = await axios.post(`/chat`, {
+          user_input: input
+        })
+        
+        // Add bot response to the chat
+        setMessages(prev => [...prev, { role: 'bot', content: response.data.response }])
+      } catch (error) {
+        console.error('Error communicating with the backend:', error)
+        setMessages(prev => [...prev, { 
+          role: 'bot', 
+          content: "Sorry, I'm having trouble connecting to the server. Please try again later." 
+        }])
+      } finally {
+        setIsLoading(false)
+        setInput('')
+      }
+    }
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
     }
   }
 
@@ -47,6 +72,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
               </span>
             </div>
           ))}
+          {isLoading && <div className="loading-indicator">AI is thinking...</div>}
         </ScrollArea>
       </CardContent>
       <CardFooter className='absolute bottom-0 w-full'>
@@ -54,12 +80,12 @@ export default function Chat({ onClose }: { onClose: () => void }) {
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyPress}
             placeholder="Type your message..."
           />
-          <Button type="submit">Send</Button>
+          <Button type="submit" onClick={handleSend} disabled={isLoading || !input.trim()}>Send</Button>
         </form>
       </CardFooter>
     </Card>
   )
 }
-

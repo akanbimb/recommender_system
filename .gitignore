@@ -26,5 +26,4 @@ dist-ssr
 .venv
 
 __pycache__/*
-student_data/*.csv
 __pycache__
