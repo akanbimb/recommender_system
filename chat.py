@@ -3,6 +3,7 @@
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 
 app = Flask(__name__)
@@ -11,7 +12,11 @@ model_name = "microsoft/DialoGPT-medium"  # You can also use "small" or "large"
 tokenizer = AutoTokenizer.from_pretrained(model_name, force_download=True)
 model = AutoModelForCausalLM.from_pretrained(model_name, force_download=True)
 
+
 chat_history_ids = None
+
+CORS(app)
+
 
 @app.route('/chat', methods=['POST'], strict_slashes=False)
 def main():

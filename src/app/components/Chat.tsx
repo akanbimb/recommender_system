@@ -20,7 +20,6 @@ export default function Chat({ onClose }: { onClose: () => void }) {
   const [input, setInput] = useState('')
 
   const [isLoading, setIsLoading] = useState(false)
-
   const handleSend = async () => {
     if (input.trim()) {
       // Add user message to the chat
@@ -29,7 +28,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
       
       try {
         // Send the message to the backend
-        const response = await axios.post(`/chat`, {
+        const response = await axios.post(`${import.meta.env.VITE_API_URL}chat`, {
           user_input: input
         })
         
