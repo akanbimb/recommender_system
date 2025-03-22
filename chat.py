@@ -1,46 +1,85 @@
 #!/usr/bin/env python3
-"""a module for chat recommendations"""
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
+"""a module for recommendation responses using Google's Gemini model"""
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import google.generativeai as genai # type: ignore
+from dotenv import load_dotenv # type: ignore
 
+# Load environment variables
+load_dotenv()
 
+# Initialize Flask app
 app = Flask(__name__)
-
 CORS(app)
 
-model_name = "microsoft/DialoGPT-medium"  # You can also use "small" or "large"
-tokenizer = AutoTokenizer.from_pretrained(model_name, force_download=True)
-model = AutoModelForCausalLM.from_pretrained(model_name, force_download=True)
+# Configure Gemini API
+api_key = os.environ.get("GEMINI_API_KEY")
+if not api_key:
+    raise ValueError("Missing GEMINI_API_KEY environment variable")
 
+genai.configure(api_key=api_key)
 
-chat_history_ids = None
+# Define the system prompt for the recommender
+RECOMMENDER_PROMPT = """You are a helpful recommendation assistant. Your job is to provide personalized 
+recommendations based on user preferences and needs. Follow these guidelines:
 
+1. Ask clarifying questions if you need more information to make better recommendations
+2. Provide 3-5 specific recommendations for any request
+3. For each recommendation, briefly explain why it might be a good fit
+4. Consider factors like user preferences, budget, experience level, and specific requirements 
+5. Be concise and focus on quality recommendations rather than general advice
+6. If you don't have enough information to provide good recommendations, politely ask for more details
+
+Focus your recommendations on products, media (books, movies, music), activities, or services that match 
+the user's needs. Always prioritize the user's stated preferences over general popularity.
+"""
+
+model = genai.GenerativeModel('gemini-1.5-flash', 
+                            generation_config={
+                                "temperature": 0.7, 
+                                "max_output_tokens": 1024
+                            })
+
+# Store conversation history
+conversation_history = {}
 
 @app.route('/chat', methods=['POST'], strict_slashes=False)
-def main():
-    """a function to chat with the model"""
-    # Get user input
-    user_input = request.json['user_input']
+def chat():
+    """Function to chat with the Gemini model and get personalized recommendations"""
+    data = request.json
+    user_input = data.get('user_input')
+    session_id = data.get('session_id', 'default')
     
-    # Use a global variable or session to store chat history
-    global chat_history_ids  # Or use session storage
+    if not user_input:
+        return jsonify({"error": "No user input provided"}), 400
     
-    # Encode user input and append to chat history
-    new_input_ids = tokenizer.encode(user_input + tokenizer.eos_token, return_tensors='pt')
-
-    # If chat history is empty, initialize with user input
-    # Otherwise, concatenate the new user input with the chat history
-    chat_history_ids = torch.cat([chat_history_ids, new_input_ids], dim=-1) if 'chat_history_ids' in globals() and chat_history_ids is not None else new_input_ids
-
-    # Generate response
-    response_ids = model.generate(chat_history_ids, max_length=1000, pad_token_id=tokenizer.eos_token_id)
-
-    # Decode the response and return it
-    response = tokenizer.decode(response_ids[:, chat_history_ids.shape[-1]:][0], skip_special_tokens=True)
-    return jsonify({"response": response})
-
+    # Initialize conversation for new sessions
+    if session_id not in conversation_history:
+        conversation_history[session_id] = model.start_chat(
+            history=[
+                {"role": "user", "parts": [RECOMMENDER_PROMPT]},
+                {"role": "model", "parts": ["I'll act as a recommendation assistant, providing personalized suggestions based on user preferences."]}
+            ]
+        )
+    
+    chat_session = conversation_history[session_id]
+    
+    try:
+        # Send request to Gemini
+        response = chat_session.send_message(user_input)
+        
+        # Extract and format response
+        ai_response = response.text
+        
+        return jsonify({
+            "response": ai_response,
+            "session_id": session_id
+        })
+        
+    except Exception as e:
+        print(f"Error processing request: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(port=5000)
+    app.run(port=5000, debug=True)

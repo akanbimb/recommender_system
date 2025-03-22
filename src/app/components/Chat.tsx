@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { X } from 'lucide-react'
 import axios from 'axios'
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   role: 'user' | 'bot'
@@ -28,7 +29,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
       
       try {
         // Send the message to the backend
-        const response = await axios.post(`${import.meta.env.VITE_API_URL}chat`, {
+        const response = await axios.post(`${import.meta.env.VITE_API_URL}/chat`, {
           user_input: input
         })
         
@@ -62,19 +63,19 @@ export default function Chat({ onClose }: { onClose: () => void }) {
           <X className="h-4 w-4" />
         </Button>
       </CardHeader>
-      <CardContent>
-        <ScrollArea className="w-full pr-4">
+      <CardContent className="flex-1 p-4 overflow-hidden flex flex-col">
+        <ScrollArea className="flex-1 pr-4 mb-4">
           {messages.map((message, index) => (
             <div key={index} className={`mb-4 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
               <span className={`inline-block p-2 rounded-lg ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                {message.content}
+                <ReactMarkdown>{message.content}</ReactMarkdown>
               </span>
             </div>
           ))}
           {isLoading && <div className="loading-indicator">AI is thinking...</div>}
         </ScrollArea>
       </CardContent>
-      <CardFooter className='absolute bottom-0 w-full'>
+      <CardFooter className='absolute bg-white bottom-0 w-full'>
         <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="flex w-full items-center space-x-2">
           <Input
             value={input}

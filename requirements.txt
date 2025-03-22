@@ -4,3 +4,5 @@ lime
 scikit-learn
 scipy
 matplotlib
+google-generativeai
+python-dotenv
